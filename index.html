@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weather Vibes 🔥</title>
+  <style>
+    body {
+      background: #1a0020;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .weather-card {
+      max-width: 400px;
+      margin: auto;
+      padding: 20px;
+      border: 2px solid #ff00ff;
+      background: rgba(26, 10, 36, 0.9);
+      border-radius: 15px;
+    }
+
+    .chat-button {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #ff69b4;
+      border: none;
+      color: white;
+      font-size: 24px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .chatbox {
+      display: none;
+      position: fixed;
+      bottom: 100px;
+      right: 20px;
+      width: 90%;
+      max-width: 400px;
+      background: rgba(26, 10, 36, 0.95);
+      border: 2px solid #ff00ff;
+      border-radius: 15px;
+      max-height: 70vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chatbox.open {
+      display: flex;
+    }
+
+    .chat-header {
+      padding: 10px;
+      font-size: 1.2em;
+      background: #ff00ff;
+    }
+
+    .chat-messages {
+      padding: 10px;
+      flex-grow: 1;
+      overflow-y: auto;
+    }
+
+    .chat-input {
+      display: flex;
+      padding: 10px;
+    }
+
+    .chat-input input {
+      flex-grow: 1;
+      padding: 8px;
+      border-radius: 8px;
+      border: none;
+    }
+
+    .chat-input button {
+      margin-left: 8px;
+      background: #ff69b4;
+      border: none;
+      padding: 8px 15px;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .message {
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 10px;
+    }
+
+    .user-message {
+      background: #ff69b4;
+      text-align: right;
+    }
+
+    .ai-message {
+      background: #ff00ff;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="weather-card">
+    <h1>Weather Vibes 🔥</h1>
+    <p id="location">Loading...</p>
+    <p id="temperature">-- °C</p>
+    <p id="description">--</p>
+    <p id="humidity">Humidity: --%</p>
+    <p id="wind">Wind: -- km/h</p>
+  </div>
+
+  <button class="chat-button" onclick="toggleChat()">💬</button>
+
+  <div class="chatbox" id="chatbox">
+    <div class="chat-header">Chat with AI</div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input">
+      <input type="text" id="chatInput" placeholder="Ask something..." />
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const apiKey = '62faff3297087f1a4039c8fc7b9d6b17';
+    const GEMINI_API_KEY = 'BplvBCBjFlZulfLAAkohUKPvy75GVVTrZJEK0BeJ';
+
+    const locationEl = document.getElementById('location');
+    const temperatureEl = document.getElementById('temperature');
+    const descriptionEl = document.getElementById('description');
+    const humidityEl = document.getElementById('humidity');
+    const windEl = document.getElementById('wind');
+
+    const chatbox = document.getElementById('chatbox');
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    let currentTemp = '--';
+
+    function toggleChat() {
+      chatbox.classList.toggle('open');
+      chatInput.focus();
+    }
+
+    function appendMessage(text, className) {
+      const msg = document.createElement('div');
+      msg.className = 'message ' + className;
+      msg.textContent = text;
+      chatMessages.appendChild(msg);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const msg = chatInput.value.trim();
+      if (!msg) return;
+
+      appendMessage(msg, 'user-message');
+      chatInput.value = '';
+
+      appendMessage('Typing...', 'ai-message');
+
+      const payload = {
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text:
+                  msg.toLowerCase().includes('weather') && currentTemp !== '--'
+                    ? `The current temperature is ${currentTemp}. ${msg}`
+                    : msg,
+              },
+            ],
+          },
+        ],
+      };
+
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          }
+        );
+
+        const data = await res.json();
+        chatMessages.lastChild.remove(); // Remove "Typing..."
+
+        const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (reply) {
+          appendMessage(reply, 'ai-message');
+        } else {
+          appendMessage('AI could not respond.', 'ai-message');
+          console.error('Gemini API Error:', data);
+        }
+      } catch (err) {
+        chatMessages.lastChild.remove();
+        appendMessage('Error: Check your API key or network.', 'ai-message');
+        console.error('Network/API error:', err);
+      }
+    }
+
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    // Weather Code
+    function updateWeather(data) {
+      locationEl.textContent = `${data.name}, ${data.sys.country}`;
+      const temp = Math.round(data.main.temp);
+      currentTemp = `${temp}°C`;
+      temperatureEl.textContent = currentTemp;
+      descriptionEl.textContent = data.weather[0].description;
+      humidityEl.textContent = `Humidity: ${data.main.humidity}%`;
+      windEl.textContent = `Wind: ${(data.wind.speed * 3.6).toFixed(1)} km/h`;
+    }
+
+    function getWeatherByCoords(lat, lon) {
+      fetch(
+        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`
+      )
+        .then((res) => res.json())
+        .then(updateWeather)
+        .catch(() => {
+          locationEl.textContent = 'Failed to load weather.';
+        });
+    }
+
+    function getLocation() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            getWeatherByCoords(latitude, longitude);
+          },
+          () => {
+            const city = prompt('Enter your city name:');
+            if (city) getWeatherByCity(city);
+          }
+        );
+      } else {
+        const city = prompt('Enter your city name:');
+        if (city) getWeatherByCity(city);
+      }
+    }
+
+    function getWeatherByCity(city) {
+      fetch(
+        `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${apiKey}`
+      )
+        .then((res) => res.json())
+        .then(updateWeather)
+        .catch(() => {
+          locationEl.textContent = 'City not found.';
+        });
+    }
+
+    getLocation();
+  </script>
+</body>
+</html>
